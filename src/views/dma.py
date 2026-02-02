@@ -1,6 +1,5 @@
 from .base import BaseFileProcessingView
 from helpers import get_dma_properties_from_file
-import json
 
 
 class DmaView(BaseFileProcessingView):
@@ -8,29 +7,44 @@ class DmaView(BaseFileProcessingView):
     Vista para procesar archivos de pruebas DMA.
     """
     
-    def post(self):
+    def extract_file_params(self, filename: str, form: dict) -> dict:
         """
-        Procesa archivos de pruebas DMA.
+        Extrae parámetros específicos del formulario para pruebas DMA.
+        
+        Args:
+            filename (str): Nombre del archivo.
+            form (dict): Datos del formulario.
         
         Returns:
-            str: JSON con los resultados del procesamiento.
+            dict: Parámetros extraídos.
         """
-        form = self.get_form_data()
-        files = self.get_files_list("files[]")
-        results = []
+        return {
+            'label': form[f'label_{filename}'],
+        }
+    
+    def build_helper_args(self, file_data, filename: str, form_params: dict) -> dict:
+        """
+        Construye los argumentos para get_dma_properties_from_file.
         
-        for file in files:
-            try:
-                filename = file.filename
-                label = form[f'label_{filename}']
-                stringio_data = self.read_file_as_stringio(file)
-            except Exception as e:
-                print(f"Error extrayendo datos del formulario para {filename}: {e}")
-                continue
-            
-            try:
-                results.append(get_dma_properties_from_file(stringio_data, filename, label))
-            except Exception as e:
-                print(f"Error procesando archivo {filename}: {e}")
+        Args:
+            file_data: StringIO con los datos del archivo.
+            filename (str): Nombre del archivo.
+            form_params (dict): Parámetros del formulario.
         
-        return json.dumps(results)
+        Returns:
+            dict: Argumentos para la función helper.
+        """
+        return {
+            'file': file_data,
+            'filename': filename,
+            'label': form_params['label'],
+        }
+    
+    def get_helper_function(self):
+        """
+        Retorna la función helper para procesar archivos DMA.
+        
+        Returns:
+            callable: Función get_dma_properties_from_file.
+        """
+        return get_dma_properties_from_file

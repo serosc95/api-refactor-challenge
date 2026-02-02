@@ -44,6 +44,28 @@ def get_mechanical_properties(file, filename, label,
         },
     }
     
+def get_adhesion_info(file, filename, label, sample_width_in_cm=2.4):
+    '''
+    INPUT:
+        filename (strIO)
+        sample_width_in_cm (float) centimeters
+    OUTPUT:
+        average_load (float): Newtons
+        peel_strength (float): gf/in
+    '''
+    _, load, travel, _ = np.genfromtxt(file, unpack=True,skip_header=7)
+    return {
+        'filename': filename,
+        'label':label,
+        'width':sample_width_in_cm,
+        'peel_strength': None,
+        'average_load': None,
+        'plot_data': {
+            'load':load.tolist(),
+            'travel':travel.tolist(),
+        }
+    }
+    
 def get_cte_alpha_values(file, filename, label, estimated_tg=None, total_cycles=2, target_cycles=2):
     '''
     INPUT:

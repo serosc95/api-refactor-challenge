@@ -1,6 +1,5 @@
 from .base import BaseFileProcessingView
 from helpers import find_tg_from_dsc
-import json
 
 
 class DscView(BaseFileProcessingView):
@@ -8,28 +7,44 @@ class DscView(BaseFileProcessingView):
     Vista para procesar archivos de pruebas DSC.
     """
     
-    def post(self):
+    FILES_KEY = 'files'
+    REQUIRES_FORM = False
+    
+    def extract_file_params(self, filename: str, form: dict) -> dict:
         """
-        Procesa archivos de pruebas DSC.
+        DSC no requiere parámetros del formulario.
+        
+        Args:
+            filename (str): Nombre del archivo.
+            form (dict): Datos del formulario (no usado).
         
         Returns:
-            str: JSON con los resultados del procesamiento.
+            dict: Diccionario vacío.
         """
-        files = self.get_files_list("files")
-        results = []
+        return {}
+    
+    def build_helper_args(self, file_data, filename: str, form_params: dict) -> dict:
+        """
+        Construye los argumentos para find_tg_from_dsc.
         
-        for file in files:
-            try:
-                filename = file.filename
-                stringio_data = self.read_file_as_stringio(file)
-            except Exception as e:
-                print(f"Error extrayendo datos del formulario para {filename}: {e}")
-                continue
-            
-            try:
-                result = find_tg_from_dsc(stringio_data, filename)
-                results.append(result)
-            except Exception as e:
-                print(f"Error procesando archivo {filename}: {e}")
+        Args:
+            file_data: StringIO con los datos del archivo.
+            filename (str): Nombre del archivo.
+            form_params (dict): Parámetros del formulario (no usado).
         
-        return json.dumps(results)
+        Returns:
+            dict: Argumentos para la función helper.
+        """
+        return {
+            'file': file_data,
+            'filename': filename,
+        }
+    
+    def get_helper_function(self):
+        """
+        Retorna la función helper para procesar archivos DSC.
+        
+        Returns:
+            callable: Función find_tg_from_dsc.
+        """
+        return find_tg_from_dsc
