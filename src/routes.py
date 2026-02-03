@@ -6,6 +6,7 @@ from .views import (
     DmaView,
     DscView,
 )
+from .views.download import DownloadView, DownloadByNameView
 
 
 def register_routes():
@@ -40,6 +41,30 @@ def register_routes():
         '/dsc',
         view_func=DscView.as_view("dsc"),
         methods=['GET', 'POST']
+    )
+    
+    app.add_url_rule(
+        '/download/<path:file_key>',
+        view_func=DownloadView.as_view("download_by_key"),
+        methods=['GET']
+    )
+    
+    app.add_url_rule(
+        '/download',
+        view_func=DownloadView.as_view("download_by_key_query"),
+        methods=['GET']
+    )
+    
+    app.add_url_rule(
+        '/download/name/<path:filename>',
+        view_func=DownloadByNameView.as_view("download_by_name"),
+        methods=['GET']
+    )
+    
+    app.add_url_rule(
+        '/download/name',
+        view_func=DownloadByNameView.as_view("download_by_name_query"),
+        methods=['GET']
     )
 
 

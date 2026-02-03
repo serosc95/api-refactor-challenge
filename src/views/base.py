@@ -3,6 +3,7 @@ from flask.views import MethodView
 from flask import request
 from io import StringIO, BytesIO
 from typing import Callable, Dict, Any, Optional
+from src.s3_client import get_s3_client
 
 
 class BaseFileProcessingView(MethodView):
@@ -100,20 +101,32 @@ class BaseFileProcessingView(MethodView):
     
     def process_single_file(self, file, form: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
-        Procesa un archivo individual.
+        Procesa un archivo individual y lo guarda en S3.
         
         Args:
             file: Archivo de Flask.
             form (dict): Datos del formulario.
         
         Returns:
-            dict o None: Resultado del procesamiento o None si hay error.
+            dict o None: Resultado del procesamiento con file_key de S3 o None si hay error.
         """
         try:
             filename = file.filename
             if not filename:
                 print("Error: Archivo sin nombre")
                 return None
+            
+            # Guardar archivo original en S3 antes de procesar
+            file_key = None
+            try:
+                s3_client = get_s3_client()
+                # Resetear posición del archivo para leerlo completo
+                file.seek(0)
+                file_key = s3_client.upload_file(file, filename)
+                if not file_key:
+                    print(f"Advertencia: No se pudo subir '{filename}' a S3, continuando con procesamiento local")
+            except Exception as e:
+                print(f"Error subiendo archivo '{filename}' a S3: {e}. Continuando con procesamiento local")
             
             # Extraer parámetros del formulario
             if self.REQUIRES_FORM:
@@ -125,8 +138,9 @@ class BaseFileProcessingView(MethodView):
             else:
                 form_params = {}
             
-            # Leer archivo según configuración
+            # Leer archivo según configuración (resetear posición nuevamente)
             try:
+                file.seek(0)
                 file_data = self.read_file(file)
             except Exception as e:
                 print(f"Error leyendo archivo {filename}: {e}")
@@ -143,6 +157,12 @@ class BaseFileProcessingView(MethodView):
             try:
                 helper_func = self.get_helper_function()
                 result = helper_func(**helper_args)
+                
+                # Agregar información de S3 al resultado
+                if result and isinstance(result, dict):
+                    result['s3_file_key'] = file_key
+                    result['s3_uploaded'] = file_key is not None
+                
                 return result
             except Exception as e:
                 print(f"Error procesando archivo {filename}: {e}")
