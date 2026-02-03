@@ -1,22 +1,22 @@
-from flask import Response
+from flask import jsonify
 from flask.views import MethodView
 from src.s3_client import get_s3_client
 
 
 class DownloadView(MethodView):
     """
-    Vista para descargar archivos desde S3.
+    Vista para obtener URLs prefirmadas de archivos desde S3 por clave.
     """
     
     def get(self, file_key: str = None):
         """
-        Descarga un archivo desde S3 usando su clave.
+        Obtiene una URL prefirmada para descargar un archivo desde S3 usando su clave.
         
         Args:
             file_key (str): Clave del archivo en S3 (opcional, puede venir como query param).
         
         Returns:
-            Response: Archivo descargado o error 404.
+            JSON: URL prefirmada o error 404 si el archivo no existe.
         """
         from flask import request
         
@@ -25,56 +25,50 @@ class DownloadView(MethodView):
             file_key = request.args.get('file_key')
         
         if not file_key:
-            return {'error': 'file_key es requerido'}, 400
+            return jsonify({'error': 'file_key es requerido'}), 400
+        
+        # Obtener tiempo de expiración
+        expiration = request.args.get('expiration', default=3600, type=int)
         
         try:
             s3_client = get_s3_client()
-            file_content = s3_client.download_file_by_key(file_key)
+            presigned_url = s3_client.get_presigned_url_by_key(file_key, expiration)
             
-            if file_content is None:
-                return {'error': f'Archivo no encontrado: {file_key}'}, 404
+            if presigned_url is None:
+                return jsonify({
+                    'error': 'Archivo no encontrado',
+                    'file_key': file_key
+                }), 404
             
-            # Determinar content type basado en la extensión
-            import os
-            _, ext = os.path.splitext(file_key.lower())
-            content_types = {
-                '.csv': 'text/csv',
-                '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                '.xls': 'application/vnd.ms-excel',
-                '.txt': 'text/plain',
-                '.json': 'application/json',
-                '.pdf': 'application/pdf',
-            }
-            content_type = content_types.get(ext, 'application/octet-stream')            
-            filename = os.path.basename(file_key)
-            
-            return Response(
-                file_content,
-                mimetype=content_type,
-                headers={
-                    'Content-Disposition': f'attachment; filename="{filename}"'
-                }
-            )
+            return jsonify({
+                'file_key': file_key,
+                'download_url': presigned_url,
+                'expires_in': expiration,
+                'expires_in_hours': expiration / 3600
+            }), 200
             
         except Exception as e:
-            print(f"Error descargando archivo '{file_key}': {e}")
-            return {'error': f'Error al descargar archivo: {str(e)}'}, 500
+            print(f"Error obteniendo URL prefirmada para '{file_key}': {e}")
+            return jsonify({
+                'error': 'Error al generar URL de descarga',
+                'message': str(e)
+            }), 500
 
 
 class DownloadByNameView(MethodView):
     """
-    Vista para descargar archivos desde S3 por nombre.
+    Vista para obtener URLs prefirmadas de archivos desde S3 por nombre.
     """
     
     def get(self, filename: str = None):
         """
-        Descarga un archivo desde S3 usando su nombre original.
+        Obtiene una URL prefirmada para descargar un archivo desde S3 usando su nombre original.
         
         Args:
             filename (str): Nombre original del archivo (opcional, puede venir como query param).
         
         Returns:
-            Response: Archivo descargado o error 404.
+            JSON: URL prefirmada o error 404 si el archivo no existe.
         """
         from flask import request
         
@@ -83,36 +77,44 @@ class DownloadByNameView(MethodView):
             filename = request.args.get('filename')
         
         if not filename:
-            return {'error': 'filename es requerido'}, 400
+            return jsonify({'error': 'filename es requerido'}), 400
+        
+        # Obtener tiempo de expiración
+        expiration = request.args.get('expiration', default=3600, type=int)
         
         try:
             s3_client = get_s3_client()
-            file_content = s3_client.download_file_by_name(filename)
             
-            if file_content is None:
-                return {'error': f'Archivo no encontrado: {filename}'}, 404
+            # Buscar la clave del archivo
+            file_key = s3_client.find_file_key_by_name(filename)
             
-            # Determinar content type basado en la extensión
-            import os
-            _, ext = os.path.splitext(filename.lower())
-            content_types = {
-                '.csv': 'text/csv',
-                '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                '.xls': 'application/vnd.ms-excel',
-                '.txt': 'text/plain',
-                '.json': 'application/json',
-                '.pdf': 'application/pdf',
-            }
-            content_type = content_types.get(ext, 'application/octet-stream')
+            if file_key is None:
+                return jsonify({
+                    'error': 'Archivo no encontrado',
+                    'filename': filename
+                }), 404
             
-            return Response(
-                file_content,
-                mimetype=content_type,
-                headers={
-                    'Content-Disposition': f'attachment; filename="{filename}"'
-                }
-            )
+            # Generar URL prefirmada
+            presigned_url = s3_client.get_presigned_url_by_key(file_key, expiration)
+            
+            if presigned_url is None:
+                return jsonify({
+                    'error': 'Error al generar URL de descarga',
+                    'filename': filename,
+                    'file_key': file_key
+                }), 500
+            
+            return jsonify({
+                'filename': filename,
+                'file_key': file_key,
+                'download_url': presigned_url,
+                'expires_in': expiration,
+                'expires_in_hours': expiration / 3600
+            }), 200
             
         except Exception as e:
-            print(f"Error descargando archivo por nombre '{filename}': {e}")
-            return {'error': f'Error al descargar archivo: {str(e)}'}, 500
+            print(f"Error obteniendo URL prefirmada para '{filename}': {e}")
+            return jsonify({
+                'error': 'Error al generar URL de descarga',
+                'message': str(e)
+            }), 500

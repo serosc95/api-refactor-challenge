@@ -3,7 +3,7 @@ import boto3
 from botocore.exceptions import ClientError, BotoCoreError
 from io import BytesIO
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid
 
 
@@ -233,6 +233,138 @@ class S3Client:
         except Exception as e:
             print(f"Error inesperado al buscar archivo '{filename}': {e}")
             return None
+    
+    def file_exists(self, file_key: str) -> bool:
+        """
+        Verifica si un archivo existe en S3.
+        
+        Args:
+            file_key (str): Clave completa del archivo en S3.
+        
+        Returns:
+            bool: True si el archivo existe, False en caso contrario.
+        """
+        try:
+            self.s3_client.head_object(Bucket=self.bucket_name, Key=file_key)
+            return True
+        except ClientError as e:
+            error_code = e.response.get('Error', {}).get('Code', '')
+            if error_code == '404':
+                return False
+            print(f"Error verificando existencia del archivo '{file_key}': {e}")
+            return False
+        except Exception as e:
+            print(f"Error inesperado verificando archivo '{file_key}': {e}")
+            return False
+    
+    def get_presigned_url_by_key(self, file_key: str, expiration: int = 3600) -> Optional[str]:
+        """
+        Genera una URL prefirmada para descargar un archivo de S3 por su clave.
+        
+        Args:
+            file_key (str): Clave completa del archivo en S3.
+            expiration (int): Tiempo de expiración en segundos (default: 3600 = 1 hora).
+        
+        Returns:
+            str o None: URL prefirmada o None si el archivo no existe o hay error.
+        """
+        try:
+            # Verificar que el archivo existe
+            if not self.file_exists(file_key):
+                print(f"Archivo no encontrado en S3: {file_key}")
+                return None
+            
+            # Generar URL prefirmada
+            url = self.s3_client.generate_presigned_url(
+                'get_object',
+                Params={
+                    'Bucket': self.bucket_name,
+                    'Key': file_key
+                },
+                ExpiresIn=expiration
+            )
+            
+            print(f"URL prefirmada generada para: {file_key}")
+            return url
+            
+        except ClientError as e:
+            print(f"Error de AWS al generar URL prefirmada para '{file_key}': {e}")
+            return None
+        except BotoCoreError as e:
+            print(f"Error de boto3 al generar URL prefirmada para '{file_key}': {e}")
+            return None
+        except Exception as e:
+            print(f"Error inesperado al generar URL prefirmada para '{file_key}': {e}")
+            return None
+    
+    def find_file_key_by_name(self, filename: str) -> Optional[str]:
+        """
+        Busca la clave de un archivo en S3 por su nombre original.
+        Retorna la clave del archivo más reciente que coincida.
+        
+        Args:
+            filename (str): Nombre original del archivo.
+        
+        Returns:
+            str o None: Clave del archivo o None si no se encuentra.
+        """
+        try:
+            # Listar objetos en el prefijo
+            response = self.s3_client.list_objects_v2(
+                Bucket=self.bucket_name,
+                Prefix=self.BASE_PATH
+            )
+            
+            if 'Contents' not in response:
+                print(f"No se encontraron archivos en {self.BASE_PATH}")
+                return None
+            
+            # Buscar archivos que coincidan con el nombre
+            matching_files = []
+            for obj in response['Contents']:
+                key = obj['Key']
+                stored_filename = os.path.basename(key)
+                # Comparar nombres (flexible con extensión)
+                if filename in stored_filename or stored_filename.endswith(filename):
+                    matching_files.append((obj['LastModified'], key))
+            
+            if not matching_files:
+                print(f"Archivo '{filename}' no encontrado en S3")
+                return None
+            
+            # Ordenar por fecha de modificación (más reciente primero)
+            matching_files.sort(key=lambda x: x[0], reverse=True)            
+            return matching_files[0][1]
+            
+        except ClientError as e:
+            print(f"Error de AWS al buscar archivo '{filename}': {e}")
+            return None
+        except BotoCoreError as e:
+            print(f"Error de boto3 al buscar archivo '{filename}': {e}")
+            return None
+        except Exception as e:
+            print(f"Error inesperado al buscar archivo '{filename}': {e}")
+            return None
+    
+    def get_presigned_url_by_name(self, filename: str, expiration: int = 3600) -> Optional[str]:
+        """
+        Genera una URL prefirmada para descargar un archivo de S3 por su nombre original.
+        
+        Args:
+            filename (str): Nombre original del archivo.
+            expiration (int): Tiempo de expiración en segundos (default: 3600 = 1 hora).
+        
+        Returns:
+            str o None: URL prefirmada o None si el archivo no existe o hay error.
+        """
+        # Buscar la clave del archivo
+        file_key = self.find_file_key_by_name(filename)
+        
+        if not file_key:
+            return None
+        
+        # Generar URL prefirmada
+        return self.get_presigned_url_by_key(file_key, expiration)
     
     def _get_content_type(self, filename: str) -> str:
         """

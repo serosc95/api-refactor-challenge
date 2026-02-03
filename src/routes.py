@@ -44,6 +44,30 @@ def register_routes():
     )
     
     app.add_url_rule(
+        '/files/<path:file_key>',
+        view_func=DownloadView.as_view("get_file_by_key"),
+        methods=['GET']
+    )
+    
+    app.add_url_rule(
+        '/files',
+        view_func=DownloadView.as_view("get_file_by_key_query"),
+        methods=['GET']
+    )
+    
+    app.add_url_rule(
+        '/files/name/<path:filename>',
+        view_func=DownloadByNameView.as_view("get_file_by_name"),
+        methods=['GET']
+    )
+    
+    app.add_url_rule(
+        '/files/name',
+        view_func=DownloadByNameView.as_view("get_file_by_name_query"),
+        methods=['GET']
+    )
+    
+    app.add_url_rule(
         '/download/<path:file_key>',
         view_func=DownloadView.as_view("download_by_key"),
         methods=['GET']
@@ -51,7 +75,7 @@ def register_routes():
     
     app.add_url_rule(
         '/download',
-        view_func=DownloadView.as_view("download_by_key_query"),
+        view_func=DownloadView.as_view("download_by_key_query_old"),
         methods=['GET']
     )
     
@@ -63,7 +87,7 @@ def register_routes():
     
     app.add_url_rule(
         '/download/name',
-        view_func=DownloadByNameView.as_view("download_by_name_query"),
+        view_func=DownloadByNameView.as_view("download_by_name_query_old"),
         methods=['GET']
     )
 
