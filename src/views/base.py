@@ -4,6 +4,7 @@ from flask import request
 from io import StringIO, BytesIO
 from typing import Callable, Dict, Any, Optional
 from src.s3_client import get_s3_client
+from src.auth import require_api_key
 
 
 class BaseFileProcessingView(MethodView):
@@ -172,9 +173,11 @@ class BaseFileProcessingView(MethodView):
             print(f"Error general procesando archivo: {e}")
             return None
     
+    @require_api_key
     def post(self) -> str:
         """
         Método POST generalizado que procesa múltiples archivos.
+        Protegido con API key.
         
         Returns:
             str: JSON con los resultados del procesamiento.

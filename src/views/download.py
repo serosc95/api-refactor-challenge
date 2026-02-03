@@ -1,6 +1,7 @@
 from flask import jsonify
 from flask.views import MethodView
 from src.s3_client import get_s3_client
+from src.auth import require_api_key
 
 
 class DownloadView(MethodView):
@@ -8,9 +9,11 @@ class DownloadView(MethodView):
     Vista para obtener URLs prefirmadas de archivos desde S3 por clave.
     """
     
+    @require_api_key
     def get(self, file_key: str = None):
         """
         Obtiene una URL prefirmada para descargar un archivo desde S3 usando su clave.
+        Protegido con API key.
         
         Args:
             file_key (str): Clave del archivo en S3 (opcional, puede venir como query param).
@@ -60,9 +63,11 @@ class DownloadByNameView(MethodView):
     Vista para obtener URLs prefirmadas de archivos desde S3 por nombre.
     """
     
+    @require_api_key
     def get(self, filename: str = None):
         """
         Obtiene una URL prefirmada para descargar un archivo desde S3 usando su nombre original.
+        Protegido con API key.
         
         Args:
             filename (str): Nombre original del archivo (opcional, puede venir como query param).
